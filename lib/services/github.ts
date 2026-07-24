@@ -54,13 +54,25 @@ export async function createPullRequest(payload: IncidentPayload, patch: PatchRe
       /* branch may exist on retry */
     });
 
+  const body = buildPrBody(payload, patch);
+  // A PR needs >=1 commit between head and base, so write an incident record on the
+  // branch (the proposed AI diff is shown in the PR body for CodeRabbit to review).
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path: `docs/incidents/${payload.id}.md`,
+    branch,
+    message: `chore(voicesre): incident record ${payload.id}`,
+    content: Buffer.from(body).toString("base64"),
+  });
+
   const pr = await octokit.rest.pulls.create({
     owner,
     repo,
     base,
     head: branch,
     title: `[VoiceSRE] ${payload.title}`,
-    body: buildPrBody(payload, patch),
+    body,
   });
 
   await broadcastToDiscord(payload, patch, pr.data.html_url);
