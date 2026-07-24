@@ -8,6 +8,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: "not a failure" });
   }
   const payload = normalizeGithub(body);
-  void runPipeline(payload).catch((e) => console.error("pipeline error", e));
+  await runPipeline(payload).catch((e) => console.error("pipeline error", e));
   return NextResponse.json({ ok: true, incidentId: payload.id });
 }
