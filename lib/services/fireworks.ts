@@ -1,7 +1,7 @@
 import type { IncidentPayload, PatchResult } from "@/types/incident";
 
 const FIREWORKS_URL = "https://api.fireworks.ai/inference/v1/chat/completions";
-const MODEL = "accounts/fireworks/models/llama-v3p3-70b-instruct";
+const MODEL = "accounts/fireworks/models/deepseek-v4-pro";
 
 export function buildPatchPrompt(payload: IncidentPayload): string {
   return [

@@ -9,7 +9,7 @@ export const POST = async (req: NextRequest) => {
     apiKey: process.env.FIREWORKS_API_KEY,
     baseURL: "https://api.fireworks.ai/inference/v1",
   });
-  const serviceAdapter = new OpenAIAdapter({ openai, model: "accounts/fireworks/models/llama-v3p3-70b-instruct" });
+  const serviceAdapter = new OpenAIAdapter({ openai, model: "accounts/fireworks/models/deepseek-v4-pro" });
   const runtime = new CopilotRuntime();
 
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
