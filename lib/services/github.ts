@@ -44,8 +44,17 @@ export async function createPullRequest(payload: IncidentPayload, patch: PatchRe
   const { owner, repo } = parseRepo(payload.repositoryUrl);
   const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
-  const base = payload.branch || "main";
-  const baseRef = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
+  // Sentry payloads carry a release string (or nothing) as "branch" — fall back to
+  // the repo's real default branch when the requested ref doesn't exist.
+  let base = payload.branch || "main";
+  let baseRef;
+  try {
+    baseRef = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
+  } catch {
+    const { data: repoInfo } = await octokit.rest.repos.get({ owner, repo });
+    base = repoInfo.default_branch;
+    baseRef = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
+  }
   const branch = buildBranchName(payload);
 
   await octokit.rest.git
