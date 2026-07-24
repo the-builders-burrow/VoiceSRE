@@ -9,11 +9,13 @@ const STATUS_META: Record<IncidentStatus, { label: string; classes: string; icon
   TESTING_SANDBOX:{ label: "Testing",        classes: "bg-orange-500/10 text-orange-400 border-orange-500/20", icon: Bug },
   EVALUATING:     { label: "Evaluating",     classes: "bg-purple-500/10 text-purple-400 border-purple-500/20", icon: Bug },
   CALLING_ENGINEER:{ label: "Escalated",     classes: "bg-pink-500/10 text-pink-400 border-pink-500/20", icon: AlertTriangle },
+  CREATING_PR:    { label: "Creating PR",   classes: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20", icon: GitPullRequest },
+  REVIEWED:       { label: "Reviewed",       classes: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", icon: GitPullRequest },
   APPROVED:       { label: "Approved",       classes: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", icon: GitPullRequest },
   REJECTED:       { label: "Rejected",       classes: "bg-red-500/10 text-red-400 border-red-500/20", icon: AlertTriangle },
 };
 
-const LIVE_STATUSES: IncidentStatus[] = ["INGESTED", "PATCHING", "TESTING_SANDBOX", "EVALUATING"];
+const LIVE_STATUSES: IncidentStatus[] = ["INGESTED", "PATCHING", "TESTING_SANDBOX", "EVALUATING", "CREATING_PR"];
 
 function formatTimestamp(iso: string) {
   return new Intl.DateTimeFormat("en-US", {

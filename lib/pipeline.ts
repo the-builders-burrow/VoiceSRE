@@ -22,17 +22,26 @@ export async function runPipeline(payload: IncidentPayload): Promise<void> {
   const evals = await evaluatePatch(payload, patch, sandbox);
   updateIncident(payload.id, { evals });
 
+  // PR first, call second — the call is for discussion/review, not approval gate
+  updateIncident(payload.id, { status: "CREATING_PR" });
+  appendLog(payload.id, "[github] opening PR");
+  const { prUrl } = await createPullRequest(payload, patch);
+  updateIncident(payload.id, { status: "APPROVED", prUrl });
+
+  // Fire-and-forget phone call — engineer can discuss PR with CodeRabbit via the call
   updateIncident(payload.id, { status: "CALLING_ENGINEER" });
-  appendLog(payload.id, `[telephony] calling on-call, confidence ${evals.overallConfidence}`);
-  await dispatchCall(getIncident(payload.id)!);
+  appendLog(payload.id, `[telephony] calling on-call, confidence ${evals.overallConfidence}, PR ${prUrl}`);
+  dispatchCall(getIncident(payload.id)!).catch((e) =>
+    appendLog(payload.id, `[telephony] call failed: ${e}`),
+  );
 }
 
 export async function approveIncident(id: string): Promise<void> {
   const state = getIncident(id);
-  if (!state?.patch) throw new Error(`incident ${id} has no patch`);
-  appendLog(id, "[github] approved — opening PR");
-  const { prUrl } = await createPullRequest(state.payload, state.patch);
-  updateIncident(id, { status: "APPROVED", prUrl });
+  if (!state) throw new Error(`incident ${id} not found`);
+  // PR is already open — just mark reviewed
+  updateIncident(id, { status: "REVIEWED" });
+  appendLog(id, "[pipeline] engineer reviewed via call");
 }
 
 export function rejectIncident(id: string): void {

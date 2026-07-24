@@ -1,9 +1,40 @@
 import type { IncidentState } from "@/types/incident";
 
-export function buildCallPrompt(state: IncidentState): string {
-  const rc = state.patch?.rootCause ?? "unknown";
-  const conf = state.evals?.overallConfidence ?? 0;
-  return `Incident on ${state.payload.environment}. Root cause: ${rc}. Safety confidence is ${conf} out of 100. Say approve to open the pull request, or reject.`;
+export interface CallContext {
+  title: string;
+  environment: string;
+  source: string;
+  rootCause: string;
+  explanation: string;
+  targetFile: string;
+  stackTrace: string;
+  functionalScore: number;
+  securityScore: number;
+  cleanlinessScore: number;
+  confidence: number;
+  prUrl: string;
+}
+
+export function buildCallContext(state: IncidentState): CallContext {
+  return {
+    title: state.payload.title,
+    environment: state.payload.environment,
+    source: state.payload.source,
+    rootCause: state.patch?.rootCause ?? "unknown",
+    explanation: state.patch?.explanation ?? "no explanation available",
+    targetFile: state.patch?.targetFile ?? "unknown",
+    stackTrace: state.payload.stackTrace.slice(0, 1500),
+    functionalScore: state.evals?.functionalScore ?? 0,
+    securityScore: state.evals?.securityScore ?? 0,
+    cleanlinessScore: state.evals?.cleanlinessScore ?? 0,
+    confidence: state.evals?.overallConfidence ?? 0,
+    prUrl: state.prUrl ?? "not yet created",
+  };
+}
+
+// One-line summary for the spoken opener — agent elaborates from full context.
+export function buildCallSummary(ctx: CallContext): string {
+  return `Production incident on ${ctx.environment}: ${ctx.title}. Root cause: ${ctx.rootCause}. Safety confidence ${ctx.confidence}%.`;
 }
 
 export function classifyTranscript(text: string): "APPROVE" | "REJECT" | "UNCLEAR" {
@@ -16,16 +47,19 @@ export function classifyTranscript(text: string): "APPROVE" | "REJECT" | "UNCLEA
 // Outbound call via the local telephony bridge (bridge/server.mjs), which streams
 // Twilio Media Streams <-> ElevenLabs Conversational AI. This avoids importing the
 // Twilio number into ElevenLabs (blocked on Twilio trial accounts, error 20003).
-// The bridge places the Twilio call and speaks `summary` through the agent.
+// Sends full incident context in POST body — bridge stores it and injects into
+// ElevenLabs dynamic_variables so the agent can answer follow-up questions.
 export async function dispatchCall(state: IncidentState): Promise<{ callId: string }> {
   const bridgeUrl = process.env.BRIDGE_URL || "http://localhost:8080";
+  const ctx = buildCallContext(state);
   const res = await fetch(`${bridgeUrl}/outbound-call`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       number: process.env.ON_CALL_PHONE_NUMBER,
       incidentId: state.payload.id,
-      summary: buildCallPrompt(state),
+      summary: buildCallSummary(ctx),
+      context: ctx,
     }),
   });
   if (!res.ok) throw new Error(`bridge call ${res.status}: ${await res.text()}`);

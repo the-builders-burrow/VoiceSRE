@@ -31,6 +31,10 @@ const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
+// In-memory store for incident context — keyed by incidentId, consumed in WS handler.
+// Avoids cramming full patch diffs into URL query params (~2KB limit).
+const contextStore = new Map();
+
 async function getSignedUrl() {
   const r = await fetch(
     `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${ELEVENLABS_AGENT_ID}`,
@@ -50,10 +54,13 @@ function classify(text) {
 fastify.get("/health", async () => ({ ok: true, publicUrl: PUBLIC_URL || null }));
 
 // Next.js dispatchCall() POSTs here (server-to-server, can be localhost).
+// Stores full context in contextStore — only incidentId goes through URL params.
 fastify.post("/outbound-call", async (req, reply) => {
-  const { number, incidentId = "", summary = "" } = req.body || {};
+  const { number, incidentId = "", summary = "", context = {} } = req.body || {};
   if (!number) return reply.code(400).send({ error: "number required" });
   if (!PUBLIC_HOST) return reply.code(500).send({ error: "PUBLIC_URL not set" });
+  // Store context so the WS handler can inject it into ElevenLabs dynamic_variables
+  contextStore.set(incidentId, context);
   const qs = `incidentId=${encodeURIComponent(incidentId)}&summary=${encodeURIComponent(summary)}`;
   const call = await twilio.calls.create({
     from: TWILIO_PHONE_NUMBER,
@@ -78,6 +85,28 @@ fastify.all("/outbound-call-twiml", async (req, reply) => {
 </Response>`;
   reply.type("text/xml").send(xml);
 });
+
+// Conversational agent prompt — agent can discuss incident details, answer questions,
+// and explain the patch before asking for a decision. Full context injected via
+// dynamic_variables so the agent can reference specific scores, files, and traces.
+const AGENT_PROMPT = [
+  "You are VoiceSRE, an autonomous site-reliability engineer calling the on-call engineer about a production incident.",
+  "You have full incident context in your dynamic variables: title, environment, root cause, explanation of the fix, ",
+  "target file, stack trace, evaluation scores (functional, security, cleanliness, overall confidence), and the PR URL.",
+  "",
+  "Start the call by briefly stating the incident title, root cause, and overall confidence score.",
+  "Then offer to answer any questions — the engineer can ask about:",
+  "- What file was changed and why",
+  "- How the fix works (explanation)",
+  "- What the stack trace shows",
+  "- Individual eval scores (functional, security, cleanliness)",
+  "- Whether the patch is safe to merge",
+  "",
+  "Be conversational. Answer questions using the context you have. Don't rush to a decision.",
+  "When the engineer seems ready, ask clearly: 'Would you like me to approve and open this pull request?'",
+  "If the engineer says approve or reject, confirm the decision in one short sentence and end the call.",
+  "If you don't know something that isn't in your context, be honest about it.",
+].join(" ");
 
 fastify.register(async (f) => {
   f.get("/outbound-media-stream", { websocket: true }, (ws) => {
@@ -115,23 +144,28 @@ fastify.register(async (f) => {
       elevenWs = new WebSocket(signedUrl);
 
       elevenWs.on("open", () => {
+        // Pull full context from store (injected by /outbound-call POST)
+        const context = contextStore.get(params.incidentId) || {};
+        // Clean up after consumption — each incident gets one call
+        contextStore.delete(params.incidentId);
+
         const firstMessage = params.summary
-          ? `This is VoiceSRE. ${params.summary}`
+          ? `This is VoiceSRE. ${params.summary} What would you like to know?`
           : "This is VoiceSRE, an autonomous on-call agent.";
+
         elevenWs.send(JSON.stringify({
           type: "conversation_initiation_client_data",
           conversation_config_override: {
             agent: {
-              prompt: {
-                prompt:
-                  "You are VoiceSRE, an autonomous site-reliability engineer calling the on-call engineer about a production incident. " +
-                  "State the root cause in one sentence, report the safety confidence score, then ask clearly: should I open the pull request? " +
-                  "Listen for approval or rejection. When the engineer says approve or reject, confirm the decision in one short sentence and end the call. Keep it brief.",
-              },
+              prompt: { prompt: AGENT_PROMPT },
               first_message: firstMessage,
             },
           },
-          dynamic_variables: { incident_id: params.incidentId, summary: params.summary },
+          dynamic_variables: {
+            incident_id: params.incidentId,
+            summary: params.summary,
+            ...context,
+          },
         }));
       });
 

@@ -46,25 +46,28 @@ const payload: IncidentPayload = {
 };
 
 describe("e2e smoke", () => {
-  it("drives an incident from ingest through approval", async () => {
+  it("drives an incident from ingest through PR and call", async () => {
     await runPipeline(payload);
 
     const mid = getIncident("e2e-1")!;
+    // Pipeline now creates PR automatically, then fires call
     expect(mid.status).toBe("CALLING_ENGINEER");
     expect(mid.patch?.targetFile).toBe("app/lib/foo.ts");
     expect(mid.sandbox?.testsPassed).toBe(true);
     expect(mid.evals?.overallConfidence).toBe(97);
+    expect(mid.prUrl).toBe("https://github.com/acme/widgets/pull/7");
 
-    // logs captured along the way (fireworks diagnose, daytona command, telephony)
+    // logs captured along the way (fireworks, daytona, github PR, telephony)
     const logs = getLogs("e2e-1").join("\n");
     expect(logs).toContain("[fireworks]");
     expect(logs).toContain("$ pnpm test");
+    expect(logs).toContain("[github]");
     expect(logs).toContain("[telephony]");
 
+    // approve marks reviewed (PR already exists)
     await approveIncident("e2e-1");
     const done = getIncident("e2e-1")!;
-    expect(done.status).toBe("APPROVED");
+    expect(done.status).toBe("REVIEWED");
     expect(done.prUrl).toBe("https://github.com/acme/widgets/pull/7");
-    expect(getLogs("e2e-1").join("\n")).toContain("[github]");
   });
 });

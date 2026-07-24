@@ -39,7 +39,9 @@ export type IncidentStatus =
   | "PATCHING"
   | "TESTING_SANDBOX"
   | "EVALUATING"
+  | "CREATING_PR"
   | "CALLING_ENGINEER"
+  | "REVIEWED"
   | "APPROVED"
   | "REJECTED";
 

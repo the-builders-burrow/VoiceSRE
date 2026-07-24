@@ -1,0 +1,16 @@
+{
+  "name": "voicesre-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "fastify": "^5",
+    "@fastify/websocket": "^11",
+    "@fastify/formbody": "^8",
+    "ws": "^8",
+    "twilio": "^6"
+  }
+}

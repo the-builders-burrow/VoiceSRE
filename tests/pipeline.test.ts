@@ -48,20 +48,21 @@ const payload: IncidentPayload = {
 };
 
 describe("pipeline", () => {
-  it("runs through to CALLING_ENGINEER with patch, sandbox, evals set", async () => {
+  it("runs through to CALLING_ENGINEER with PR, patch, sandbox, evals set", async () => {
     await runPipeline(payload);
     const s = getIncident("p1")!;
     expect(s.patch?.rootCause).toBe("rc");
     expect(s.sandbox?.testsPassed).toBe(true);
     expect(s.evals?.overallConfidence).toBe(90);
     expect(s.status).toBe("CALLING_ENGINEER");
+    expect(s.prUrl).toContain("/pull/"); // PR created automatically
   });
 
-  it("approve creates PR and sets APPROVED", async () => {
+  it("approve marks REVIEWED (PR already open)", async () => {
     await runPipeline({ ...payload, id: "p2" });
     await approveIncident("p2");
     const s = getIncident("p2")!;
     expect(s.prUrl).toContain("/pull/");
-    expect(s.status).toBe("APPROVED");
+    expect(s.status).toBe("REVIEWED");
   });
 });
