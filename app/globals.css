@@ -98,3 +98,19 @@ body {
 .animate-pulse-ring {
   animation: pulse-ring 2s infinite;
 }
+
+/* CopilotKit sidebar — narrower and theme-matched */
+@media (min-width: 640px) {
+  .copilotKitSidebar .copilotKitWindow {
+    width: 22rem;
+  }
+  .copilotKitSidebarContentWrapper.sidebarExpanded {
+    margin-right: 22rem;
+  }
+}
+
+.copilotKitSidebar .copilotKitWindow {
+  background-color: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
