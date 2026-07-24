@@ -7,6 +7,25 @@ export function parseRepo(url: string): { owner: string; repo: string } {
   return { owner: m[1], repo: m[2] };
 }
 
+// Fetch file contents from the repo's default branch; silently skips paths that don't exist.
+export async function fetchRepoFiles(repositoryUrl: string, paths: string[]): Promise<Record<string, string>> {
+  if (!paths.length) return {};
+  const { owner, repo } = parseRepo(repositoryUrl);
+  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  const out: Record<string, string> = {};
+  for (const path of paths) {
+    try {
+      const { data } = await octokit.rest.repos.getContent({ owner, repo, path });
+      if (!Array.isArray(data) && "content" in data && data.size < 32768) {
+        out[path] = Buffer.from(data.content, "base64").toString("utf8");
+      }
+    } catch {
+      /* not in repo — skip */
+    }
+  }
+  return out;
+}
+
 export function buildBranchName(payload: IncidentPayload): string {
   return `voicesre/fix-${payload.id}`;
 }

@@ -16,6 +16,8 @@ export interface PatchResult {
   targetFile: string;
   patchDiff: string;
   explanation: string;
+  /** Complete corrected file content — what the sandbox writes and tests. */
+  fixedContent?: string;
 }
 
 export interface DaytonaExecutionResult {
