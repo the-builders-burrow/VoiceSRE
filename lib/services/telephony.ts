@@ -44,9 +44,9 @@ export function classifyTranscript(text: string): "APPROVE" | "REJECT" | "UNCLEA
   return "UNCLEAR";
 }
 
-// Outbound call via the local telephony bridge (bridge/server.mjs), which streams
-// Twilio Media Streams <-> ElevenLabs Conversational AI. This avoids importing the
-// Twilio number into ElevenLabs (blocked on Twilio trial accounts, error 20003).
+// Outbound call via the telephony bridge (bridge/server.mjs), which streams
+// SignalWire media streams <-> ElevenLabs Conversational AI. SignalWire, not Twilio:
+// Twilio trial accounts strip <Connect><Stream> from TwiML entirely.
 // Sends full incident context in POST body — bridge stores it and injects into
 // ElevenLabs dynamic_variables so the agent can answer follow-up questions.
 export async function dispatchCall(state: IncidentState): Promise<{ callId: string }> {

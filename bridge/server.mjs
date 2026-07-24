@@ -1,32 +1,48 @@
-// VoiceSRE telephony bridge: Twilio Media Streams <-> ElevenLabs Conversational AI.
-// Runs as a standalone process (Next.js App Router can't do raw WS upgrade for Twilio).
-// No Twilio number import required, so it works on a trial account (calls.create is allowed).
+// VoiceSRE telephony bridge: SignalWire media streams <-> ElevenLabs Conversational AI.
+// Runs as a standalone process (Next.js App Router can't do raw WS upgrade).
+// SignalWire speaks the Twilio-compatible protocol (same TwiML <Connect><Stream>, same
+// start/media/stop WS events) but its trial does NOT strip <Stream> like Twilio's does.
 //
 // Run:  node --env-file=.env.local bridge/server.mjs
-// Needs a public tunnel to PORT (e.g. cloudflared) exported as PUBLIC_URL=https://xxx.trycloudflare.com
+// Needs a public URL to PORT (Render service or tunnel) exported as PUBLIC_URL=https://...
 import Fastify from "fastify";
 import fastifyWs from "@fastify/websocket";
 import fastifyFormBody from "@fastify/formbody";
 import WebSocket from "ws";
-import Twilio from "twilio";
 
 const {
   ELEVENLABS_API_KEY,
   ELEVENLABS_AGENT_ID,
-  TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN,
-  TWILIO_PHONE_NUMBER,
-  PUBLIC_URL, // https tunnel to this server, no trailing slash
+  SIGNALWIRE_SPACE_URL, // e.g. example.signalwire.com
+  SIGNALWIRE_PROJECT_ID,
+  SIGNALWIRE_API_TOKEN,
+  SIGNALWIRE_PHONE_NUMBER,
+  PUBLIC_URL, // https URL to this server, no trailing slash
   NEXT_WEBHOOK_URL = "http://localhost:3000/api/elevenlabs/webhook",
 } = process.env;
 
 const PORT = Number(process.env.PORT || process.env.BRIDGE_PORT || 8080);
-if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-  throw new Error("bridge: missing required env (ELEVENLABS_*/TWILIO_*)");
+if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID || !SIGNALWIRE_SPACE_URL || !SIGNALWIRE_PROJECT_ID || !SIGNALWIRE_API_TOKEN || !SIGNALWIRE_PHONE_NUMBER) {
+  throw new Error("bridge: missing required env (ELEVENLABS_*/SIGNALWIRE_*)");
 }
 const PUBLIC_HOST = (PUBLIC_URL || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-const twilio = new Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+const SW_SPACE = SIGNALWIRE_SPACE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "");
+const SW_AUTH = "Basic " + Buffer.from(`${SIGNALWIRE_PROJECT_ID}:${SIGNALWIRE_API_TOKEN}`).toString("base64");
+
+async function createCall({ from, to, url }) {
+  const res = await fetch(
+    `https://${SW_SPACE}/api/laml/2010-04-01/Accounts/${SIGNALWIRE_PROJECT_ID}/Calls.json`,
+    {
+      method: "POST",
+      headers: { Authorization: SW_AUTH, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ From: from, To: to, Url: url }),
+    },
+  );
+  if (!res.ok) throw new Error(`signalwire calls.create ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 const fastify = Fastify();
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
@@ -62,8 +78,8 @@ fastify.post("/outbound-call", async (req, reply) => {
   // Store context so the WS handler can inject it into ElevenLabs dynamic_variables
   contextStore.set(incidentId, context);
   const qs = `incidentId=${encodeURIComponent(incidentId)}&summary=${encodeURIComponent(summary)}`;
-  const call = await twilio.calls.create({
-    from: TWILIO_PHONE_NUMBER,
+  const call = await createCall({
+    from: SIGNALWIRE_PHONE_NUMBER,
     to: number,
     url: `https://${PUBLIC_HOST}/outbound-call-twiml?${qs}`,
   });
