@@ -28,7 +28,9 @@ export async function dispatchCall(state: IncidentState): Promise<{ callId: stri
     },
     body: JSON.stringify({
       agent_id: AGENT_ID,
-      agent_phone_number_id: process.env.TWILIO_PHONE_NUMBER,
+      // ElevenLabs expects the phone-number ID from an imported Twilio number
+      // (phnum_...), NOT the raw E.164 number. Import via POST /v1/convai/phone-numbers.
+      agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
       to_number: process.env.ON_CALL_PHONE_NUMBER,
       conversation_initiation_client_data: {
         dynamic_variables: {
