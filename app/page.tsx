@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CopilotSidebar } from "@copilotkit/react-ui";
 import type { IncidentState } from "@/types/incident";
 import { IncidentCard } from "@/components/dashboard/IncidentCard";
+import { VoiceCallWidget } from "@/components/dashboard/VoiceCallWidget";
 import { Activity, ShieldCheck, GitPullRequest, Radio } from "lucide-react";
 
 type LiveIncident = IncidentState & { logs: string[] };
@@ -114,6 +115,12 @@ export default function Page() {
           </section>
         </div>
       </main>
+
+      {/* Voice call widget for the latest incident with a patch */}
+      {(() => {
+        const callable = incidents.filter((i) => i.patch).at(-1);
+        return callable ? <VoiceCallWidget key={callable.payload.id} state={callable} /> : null;
+      })()}
 
       {/* Copilot sidebar */}
       <CopilotSidebar
