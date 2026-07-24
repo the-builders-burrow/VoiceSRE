@@ -9,6 +9,9 @@ import { createPullRequest } from "@/lib/services/github";
 export async function runPipeline(payload: IncidentPayload): Promise<void> {
   createIncident(payload);
 
+  // Wake the free-tier bridge now so it's warm when dispatchCall fires ~60s later
+  fetch(`${process.env.BRIDGE_URL || "http://localhost:8080"}/health`).catch(() => {});
+
   updateIncident(payload.id, { status: "PATCHING" });
   appendLog(payload.id, `[fireworks] diagnosing ${payload.title}`);
   const patch = await generatePatch(payload);
