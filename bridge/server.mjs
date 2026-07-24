@@ -20,7 +20,7 @@ const {
   NEXT_WEBHOOK_URL = "http://localhost:3000/api/elevenlabs/webhook",
 } = process.env;
 
-const PORT = Number(process.env.BRIDGE_PORT || 8080);
+const PORT = Number(process.env.PORT || process.env.BRIDGE_PORT || 8080);
 if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID || !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
   throw new Error("bridge: missing required env (ELEVENLABS_*/TWILIO_*)");
 }
